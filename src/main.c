@@ -107,7 +107,40 @@ static void protocol_cb(u8_t protocol)
 		"boot" : "report");
 }
 
+static char buf[64];
+
+static int set_report_cb(struct usb_setup_packet* setup, s32_t* len, u8_t** data) {
+	LOG_ERR("Set Report(0x%02x): %d", setup->wValue, *len);
+	LOG_HEXDUMP_WRN(*data, *len, "");
+	if (*len - 1 > sizeof(buf)) {
+		LOG_ERR("overflow");
+		return -1;
+	}
+
+	if ((setup->wValue & 0xff) != 0xf0) {
+		LOG_ERR("unknown report id");
+		return -1;
+	}
+
+	memcpy(buf, *data + 1, *len - 1);
+	return 0;
+}
+
+static int get_report_cb(struct usb_setup_packet* setup, s32_t* len, u8_t** data) {
+	LOG_ERR("Get Report(0x%02x): %d", setup->wValue, *len);
+	if ((setup->wValue & 0xff) != 0xf1) {
+		LOG_ERR("unknown report id");
+		return -1;
+	}
+
+	memcpy(*data + 1, buf, *len - 1);
+	LOG_HEXDUMP_WRN(*data, *len, "");
+	return 0;
+}
+
 static const struct hid_ops ops = {
+	.set_report = set_report_cb,
+	.get_report = get_report_cb,
 	.int_in_ready = in_ready_cb,
 	.status_cb = status_cb,
 	.on_idle = idle_cb,
